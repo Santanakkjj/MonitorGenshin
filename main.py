@@ -12,6 +12,7 @@ from winotify import Notification
 stop_event = threading.Event()
 process_start_times = {}  
 window_was_open = False 
+monitor_start_time = time()
 
 def notify():
     notification = Notification(
@@ -40,9 +41,34 @@ def monitor_genshin():
                 if proc.info["name"] != "GenshinImpact.exe":
                     continue
 
-                print("Processo do Genshin encontrado!")
                 genshin_process_found = True
                 pid = proc.info["pid"]  # PEGA O ID DO PROCESSO DO GENSHIN
+
+                process_created = proc.create_time()  # PEGA O TEMPO DE CRIAÇÃO DO PROCESSO {ATUALIZADO--}
+
+                if process_created < monitor_start_time and not genshin_window:
+                    try:
+                        proc.terminate()
+                        proc.wait(timeout=3)
+
+                    except psutil.TimeoutExpired:
+                        try:
+                            proc.kill()
+                            proc.wait(timeout=3)
+                        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.TimeoutExpired):
+                            pass
+
+                    except psutil.NoSuchProcess:
+                        pass
+
+                    except psutil.AccessDenied:
+                        pass
+                    
+
+                    notify()
+                    process_start_times.pop(pid, None)  
+                    continue
+                    
 
                  # SE A JANELA DO GENSHIN JÁ ABRIU ANTES E AGORA ESTÁ FECHADA, ENCERRA O PROCESSO DO GENSHIN
                 if window_was_open and not genshin_window:
@@ -78,8 +104,15 @@ def monitor_genshin():
                 # obs: necessário pois sem isso não era possível iniciar o jogo já que o processo abria antes da janela aparecer
 
                 if not window_was_open and elapsed_time >= 60:
-                    proc.terminate()  
-                    proc.wait(timeout=3)  
+                    try:
+                        proc.terminate()
+                        proc.wait(timeout=3)
+                    except psutil.TimeoutExpired:
+                        try:
+                            proc.kill()
+                            proc.wait(timeout=3)
+                        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.TimeoutExpired):
+                            pass
                     notify()
                     process_start_times.pop(pid, None)
 
